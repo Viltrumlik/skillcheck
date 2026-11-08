@@ -89,47 +89,47 @@ class CheckTest(unittest.TestCase):
     def test_a_correct_project_passes(self):
         out = self.run_cli()
         self.assertEqual(out.returncode, 0, out.stdout)
-        self.assertIn("toza", out.stdout)
+        self.assertIn("clean", out.stdout)
 
     # -- SKILL.md ---------------------------------------------------------
 
     def test_missing_frontmatter_is_an_error(self):
         self.p.write("skills/demo/SKILL.md", "# demo\n\nno frontmatter here\n")
-        self.assertError("frontmatter yo'q")
+        self.assertError("no frontmatter")
 
     def test_a_name_that_breaks_the_pattern_is_an_error(self):
         self.p.write("skills/demo/SKILL.md",
                      GOOD_SKILL.replace("name: demo", "name: Demo_Skill"))
-        self.assertError("qoidaga mos emas")
+        self.assertError("breaks the pattern")
 
     def test_a_name_that_differs_from_the_folder_is_a_warning(self):
         self.p.write("skills/demo/SKILL.md",
                      GOOD_SKILL.replace("name: demo", "name: other"))
-        self.assertWarning("papka nomi")
+        self.assertWarning("does not match its folder")
 
     def test_a_missing_description_is_an_error(self):
         self.p.write("skills/demo/SKILL.md", "---\nname: demo\n---\n\nbody\n")
-        self.assertError("description yo'q")
+        self.assertError("no description")
 
     def test_a_description_over_the_limit_is_an_error(self):
         long = "x" * (sc.MAX_DESCRIPTION + 1)
         self.p.write("skills/demo/SKILL.md",
                      "---\nname: demo\ndescription: %s\n---\n\nbody\n" % long)
-        self.assertError("juda uzun")
+        self.assertError("too long")
 
     def test_a_very_short_description_is_a_warning(self):
         self.p.write("skills/demo/SKILL.md",
                      "---\nname: demo\ndescription: does stuff\n---\n\nbody\n")
-        self.assertWarning("juda qisqa")
+        self.assertWarning("very short")
 
     def test_an_empty_body_is_a_warning(self):
         self.p.write("skills/demo/SKILL.md", GOOD_SKILL.split("# demo")[0])
-        self.assertWarning("matn yo'q")
+        self.assertWarning("nothing after the frontmatter")
 
     def test_a_skill_at_the_root_is_also_checked(self):
         shutil.rmtree(os.path.join(self.tmp, "skills"))
         self.p.write("SKILL.md", "# no frontmatter\n")
-        self.assertError("frontmatter yo'q")
+        self.assertError("no frontmatter")
 
     # -- plugin.json ------------------------------------------------------
 
@@ -137,11 +137,11 @@ class CheckTest(unittest.TestCase):
         self.p.write(".claude-plugin/plugin.json", "{ name: broken, }")
         out = self.run_cli()
         self.assertEqual(out.returncode, 3)
-        self.assertIn("JSON o'qilmadi", out.stdout)
+        self.assertIn("invalid JSON", out.stdout)
 
     def test_a_missing_plugin_name_is_an_error(self):
         self.p.json(".claude-plugin/plugin.json", {"version": "0.1.0"})
-        self.assertError("name yo'q")
+        self.assertError("no name")
 
     def test_a_non_semver_version_is_a_warning(self):
         self.p.json(".claude-plugin/plugin.json", dict(GOOD_PLUGIN, version="v1"))
@@ -151,51 +151,51 @@ class CheckTest(unittest.TestCase):
         plugin = dict(GOOD_PLUGIN)
         del plugin["keywords"]
         self.p.json(".claude-plugin/plugin.json", plugin)
-        self.assertWarning("keywords yo'q")
+        self.assertWarning("no keywords")
 
     # -- marketplace.json -------------------------------------------------
 
     def test_a_source_that_does_not_exist_is_an_error(self):
         self.p.json(".claude-plugin/marketplace.json", dict(
             GOOD_MARKET, plugins=[{"name": "demo", "source": "./nowhere"}]))
-        self.assertError("mavjud emas")
+        self.assertError("does not exist")
 
     def test_a_version_that_disagrees_with_plugin_json_is_a_warning(self):
         self.p.json(".claude-plugin/marketplace.json", dict(
             GOOD_MARKET, plugins=[{"name": "demo", "source": "./", "version": "9.9.9"}]))
-        self.assertWarning("mos emas")
+        self.assertWarning("disagrees with")
 
     def test_an_empty_plugins_list_is_an_error(self):
         self.p.json(".claude-plugin/marketplace.json", dict(GOOD_MARKET, plugins=[]))
-        self.assertError("plugins bo'sh")
+        self.assertError("plugins is empty")
 
     # -- hooks.json -------------------------------------------------------
 
     def test_an_unknown_event_name_is_a_warning(self):
         self.p.json("hooks/hooks.json", {"hooks": {"PreToolUze": [
             {"matcher": ".*", "hooks": [{"type": "command", "command": "x"}]}]}})
-        self.assertWarning("notanish hodisa")
+        self.assertWarning("unknown event")
 
     def test_a_missing_command_is_an_error(self):
         self.p.json("hooks/hooks.json", {"hooks": {"SessionStart": [
             {"matcher": ".*", "hooks": [{"type": "command"}]}]}})
-        self.assertError("command yo'q")
+        self.assertError("no command")
 
     def test_a_wrong_hook_type_is_an_error(self):
         self.p.json("hooks/hooks.json", {"hooks": {"SessionStart": [
             {"matcher": ".*", "hooks": [{"type": "script", "command": "x"}]}]}})
-        self.assertError("command\" bo'lishi kerak")
+        self.assertError('must be "command"')
 
     def test_a_missing_matcher_is_a_warning(self):
         self.p.json("hooks/hooks.json", {"hooks": {"SessionStart": [
             {"hooks": [{"type": "command", "command": "x"}]}]}})
-        self.assertWarning("matcher yo'q")
+        self.assertWarning("no matcher")
 
     def test_a_hook_pointing_at_a_missing_script_is_an_error(self):
         self.p.json("hooks/hooks.json", {"hooks": {"SessionStart": [
             {"matcher": ".*", "hooks": [{"type": "command",
              "command": 'python3 "${CLAUDE_PLUGIN_ROOT}/scripts/gone.py"'}]}]}})
-        self.assertError("mavjud emas")
+        self.assertError("does not exist")
 
     def test_a_hook_pointing_at_a_real_script_is_fine(self):
         self.p.write("scripts/here.py", "print(1)\n")
@@ -206,7 +206,7 @@ class CheckTest(unittest.TestCase):
 
     def test_hooks_without_a_plugin_manifest_is_a_warning(self):
         self.p.remove(".claude-plugin/plugin.json")
-        self.assertWarning("plugin.json yo'q")
+        self.assertWarning("no .claude-plugin/plugin.json")
 
     # -- xatti-harakat ----------------------------------------------------
 
@@ -220,7 +220,7 @@ class CheckTest(unittest.TestCase):
         try:
             out = subprocess.run([sys.executable, SCRIPT, empty, "--json"],
                                  capture_output=True, text=True)
-            self.assertIn("topilmadi", out.stdout)
+            self.assertIn("nothing here to check", out.stdout)
             self.assertEqual(out.returncode, 0)
         finally:
             shutil.rmtree(empty, ignore_errors=True)

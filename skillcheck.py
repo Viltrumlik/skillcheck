@@ -77,10 +77,10 @@ def read_json(path):
         with open(path, encoding="utf-8") as f:
             return json.load(f), None
     except ValueError as e:
-        return None, error(relative(path), "JSON o'qilmadi: %s" % e,
-                           "vergul yoki qavs tushib qolgan bo'lishi mumkin")
+        return None, error(relative(path), "invalid JSON: %s" % e,
+                           "a missing comma or bracket is the usual cause")
     except OSError as e:
-        return None, error(relative(path), "fayl ochilmadi: %s" % e)
+        return None, error(relative(path), "could not open the file: %s" % e)
 
 
 # ---------------------------------------------------------------- SKILL.md
@@ -110,46 +110,46 @@ def check_skill(path, findings, root=None):
     try:
         text = open(path, encoding="utf-8").read()
     except OSError as e:
-        findings.append(error(where, "o'qilmadi: %s" % e))
+        findings.append(error(where, "could not be read: %s" % e))
         return
 
     fields = parse_frontmatter(text)
     if fields is None:
         findings.append(error(
-            where, "frontmatter yo'q",
-            "fayl --- qatori bilan boshlanib, name va description bo'lishi kerak"))
+            where, "no frontmatter",
+            "the file must open with a --- line and carry name and description"))
         return
 
     name = fields.get("name")
     if not name:
-        findings.append(error(where, "frontmatter'da name yo'q"))
+        findings.append(error(where, "frontmatter has no name"))
     elif not NAME_RE.match(name):
         findings.append(error(
-            where, "name %r qoidaga mos emas" % name,
-            "faqat kichik harf, raqam va defis; defis bilan boshlanmaydi"))
+            where, "name %r breaks the pattern" % name,
+            "lowercase letters, digits and hyphens; cannot start or end with a hyphen"))
     else:
         folder = os.path.basename(os.path.dirname(path))
         if folder != name:
             findings.append(warn(
-                where, "name %r papka nomi %r bilan bir xil emas" % (name, folder),
-                "ko'p yuklovchilar papka nomi bo'yicha topadi"))
+                where, "name %r does not match its folder %r" % (name, folder),
+                "most loaders find a skill by its folder name"))
 
     desc = fields.get("description")
     if not desc:
         findings.append(error(
-            where, "frontmatter'da description yo'q",
-            "agent skillni shu matnga qarab tanlaydi"))
+            where, "frontmatter has no description",
+            "an agent picks the skill by reading this"))
     elif len(desc) > MAX_DESCRIPTION:
         findings.append(error(
-            where, "description juda uzun (%d > %d)" % (len(desc), MAX_DESCRIPTION)))
+            where, "description is too long (%d > %d)" % (len(desc), MAX_DESCRIPTION)))
     elif len(desc) < 20:
         findings.append(warn(
-            where, "description juda qisqa (%d belgi)" % len(desc),
-            "qachon ishlatilishini yozing, shunda agent to'g'ri paytda chaqiradi"))
+            where, "description is very short (%d characters)" % len(desc),
+            "say when to use it, so the agent reaches for it at the right moment"))
 
     body = text[FRONTMATTER.match(text).end():].strip()
     if not body:
-        findings.append(warn(where, "frontmatter'dan keyin matn yo'q"))
+        findings.append(warn(where, "nothing after the frontmatter"))
 
 
 # ---------------------------------------------------------------- manifests
@@ -162,27 +162,27 @@ def check_plugin_json(path, findings, root=None):
         findings.append(bad)
         return None
     if not isinstance(data, dict):
-        findings.append(error(where, "yuqori darajada obyekt kutilgan"))
+        findings.append(error(where, "expected an object at the top level"))
         return None
 
     name = data.get("name")
     if not name:
-        findings.append(error(where, "name yo'q"))
+        findings.append(error(where, "no name"))
     elif not NAME_RE.match(str(name)):
-        findings.append(error(where, "name %r qoidaga mos emas" % name))
+        findings.append(error(where, "name %r breaks the pattern" % name))
 
     version = data.get("version")
     if not version:
-        findings.append(warn(where, "version yo'q",
-                             "yuklovchilar yangilanishni shunga qarab biladi"))
+        findings.append(warn(where, "no version",
+                             "loaders decide what to update by this"))
     elif not VERSION_RE.match(str(version)):
-        findings.append(warn(where, "version %r semver ko'rinishida emas" % version))
+        findings.append(warn(where, "version %r is not semver-shaped" % version))
 
     if not data.get("description"):
-        findings.append(warn(where, "description yo'q",
-                             "katalog va ro'yxatlar shuni ko'rsatadi"))
+        findings.append(warn(where, "no description",
+                             "catalogues and listings show this"))
     if not data.get("keywords"):
-        findings.append(warn(where, "keywords yo'q", "qidiruvda topilmaydi"))
+        findings.append(warn(where, "no keywords", "it will not turn up in search"))
     return data
 
 
@@ -196,32 +196,32 @@ def check_marketplace_json(path, plugin, findings, root=None):
         findings.append(error(where, "yuqori darajada obyekt kutilgan"))
         return
     if not data.get("name"):
-        findings.append(error(where, "name yo'q"))
+        findings.append(error(where, "no name"))
     if not isinstance(data.get("owner"), dict):
-        findings.append(warn(where, "owner yo'q yoki obyekt emas"))
+        findings.append(warn(where, "owner missing or not an object"))
 
     plugins = data.get("plugins")
     if not isinstance(plugins, list) or not plugins:
-        findings.append(error(where, "plugins bo'sh yoki ro'yxat emas"))
+        findings.append(error(where, "plugins is empty or not a list"))
         return
     root = os.path.dirname(os.path.dirname(path))
     for i, entry in enumerate(plugins):
         tag = "%s plugins[%d]" % (where, i)
         if not isinstance(entry, dict):
-            findings.append(error(tag, "obyekt emas"))
+            findings.append(error(tag, "not an object"))
             continue
         if not entry.get("name"):
-            findings.append(error(tag, "name yo'q"))
+            findings.append(error(tag, "no name"))
         source = entry.get("source")
         if not source:
-            findings.append(error(tag, "source yo'q"))
+            findings.append(error(tag, "no source"))
         elif isinstance(source, str) and source.startswith("."):
             if not os.path.isdir(os.path.join(root, source)):
-                findings.append(error(tag, "source %r mavjud emas" % source))
+                findings.append(error(tag, "source %r does not exist" % source))
         if plugin and entry.get("version") and plugin.get("version") \
                 and entry["version"] != plugin["version"]:
             findings.append(warn(
-                tag, "version %r plugin.json dagi %r bilan mos emas"
+                tag, "version %r disagrees with plugin.json %r"
                 % (entry["version"], plugin["version"])))
 
 
@@ -233,40 +233,40 @@ def check_hooks_json(path, findings, root=None):
         return
     hooks = data.get("hooks") if isinstance(data, dict) else None
     if not isinstance(hooks, dict) or not hooks:
-        findings.append(error(where, "hooks obyekti yo'q yoki bo'sh"))
+        findings.append(error(where, "hooks object is missing or empty"))
         return
 
     root = os.path.dirname(os.path.dirname(path))
     for event, entries in hooks.items():
         if event not in KNOWN_EVENTS:
             findings.append(warn(
-                where, "notanish hodisa %r" % event,
-                "imlo xatosi bo'lsa hook hech qachon ishlamaydi va jim qoladi"))
+                where, "unknown event %r" % event,
+                "a typo here means the hook never runs, and says nothing"))
         if not isinstance(entries, list):
-            findings.append(error(where, "%s ro'yxat emas" % event))
+            findings.append(error(where, "%s is not a list" % event))
             continue
         for i, entry in enumerate(entries):
             tag = "%s %s[%d]" % (where, event, i)
             if not isinstance(entry, dict):
-                findings.append(error(tag, "obyekt emas"))
+                findings.append(error(tag, "not an object"))
                 continue
             if "matcher" not in entry:
-                findings.append(warn(tag, "matcher yo'q",
-                                     "hammasiga mos kelishi uchun \".*\" yozing"))
+                findings.append(warn(tag, "no matcher",
+                                     "use \".*\" to match everything"))
             inner = entry.get("hooks")
             if not isinstance(inner, list) or not inner:
-                findings.append(error(tag, "ichki hooks bo'sh yoki ro'yxat emas"))
+                findings.append(error(tag, "inner hooks is empty or not a list"))
                 continue
             for j, hook in enumerate(inner):
                 htag = "%s.hooks[%d]" % (tag, j)
                 if not isinstance(hook, dict):
-                    findings.append(error(htag, "obyekt emas"))
+                    findings.append(error(htag, "not an object"))
                     continue
                 if hook.get("type") != "command":
-                    findings.append(error(htag, "type \"command\" bo'lishi kerak"))
+                    findings.append(error(htag, 'type must be "command"'))
                 command = hook.get("command")
                 if not command:
-                    findings.append(error(htag, "command yo'q"))
+                    findings.append(error(htag, "no command"))
                 elif isinstance(command, str):
                     check_hook_path(command, root, htag, findings)
 
@@ -278,8 +278,8 @@ def check_hook_path(command, root, tag, findings):
     for rel in SCRIPT_IN_COMMAND.findall(command):
         if not os.path.exists(os.path.join(root, rel)):
             findings.append(error(
-                tag, "command %r faylini ko'rsatadi, u mavjud emas" % rel,
-                "yo'l plugin ildiziga nisbatan bo'lishi kerak"))
+                tag, "command points at %r, which does not exist" % rel,
+                "the path is relative to the plugin root"))
 
 
 # ---------------------------------------------------------------- walk
@@ -311,8 +311,8 @@ def check(root):
     found = collect(root)
     if not any([found["skills"], found["plugin"], found["marketplace"], found["hooks"]]):
         findings.append(warn(
-            relative(root), "tekshiradigan narsa topilmadi",
-            "skills/<nom>/SKILL.md, .claude-plugin/ yoki hooks/hooks.json kutilgan"))
+            relative(root), "nothing here to check",
+            "expected skills/<name>/SKILL.md, .claude-plugin/ or hooks/hooks.json"))
         return findings, found
     for path in found["skills"]:
         check_skill(path, findings, root)
@@ -323,51 +323,56 @@ def check(root):
         check_hooks_json(found["hooks"], findings, root)
     if found["hooks"] and not found["plugin"]:
         findings.append(warn(
-            relative(found["hooks"], root), ".claude-plugin/plugin.json yo'q",
-            "hooks faqat plugin sifatida o'rnatilganda ro'yxatdan o'tadi"))
+            relative(found["hooks"], root), "no .claude-plugin/plugin.json",
+            "hooks are only registered when installed as a plugin"))
     return findings, found
 
 
 # ---------------------------------------------------------------- cli
 
 
+def plural(n, word):
+    return "%d %s%s" % (n, word, "" if n == 1 else "s")
+
+
 def report(findings, found, root):
     errors = [f for f in findings if f.level == "error"]
     warnings = [f for f in findings if f.level == "warning"]
     for f in errors + warnings:
-        mark = "XATO " if f.level == "error" else "ogoh "
+        mark = "ERROR " if f.level == "error" else "warn  "
         print("%s%s: %s" % (mark, f.where, f.message))
         if f.hint:
             print("       %s" % f.hint)
     checked = len(found["skills"]) + sum(
         1 for k in ("plugin", "marketplace", "hooks") if found[k])
     if not findings:
-        print("toza: %d fayl tekshirildi" % checked)
+        print("clean: %s checked" % plural(checked, "file"))
     else:
-        print("\n%d xato, %d ogohlantirish (%d fayl)"
-              % (len(errors), len(warnings), checked))
+        print("\n%s, %s (%s)" % (plural(len(errors), "error"),
+                                  plural(len(warnings), "warning"),
+                                  plural(checked, "file")))
 
 
 def main(argv=None):
     p = argparse.ArgumentParser(
         prog="skillcheck",
-        description="Agent Skill va Claude Code plugin fayllarini tekshiradi.")
-    p.add_argument("path", nargs="?", default=".", metavar="YO'L")
-    p.add_argument("--json", action="store_true", help="mashina o'qiydigan chiqish")
+        description="Lint Agent Skills and Claude Code plugin manifests.")
+    p.add_argument("path", nargs="?", default=".", metavar="PATH")
+    p.add_argument("--json", action="store_true", help="machine-readable output")
     p.add_argument("--strict", action="store_true",
-                   help="ogohlantirish ham xato hisoblansin")
+                   help="treat warnings as failures too")
     p.add_argument("--version", action="version", version="skillcheck " + VERSION)
     args = p.parse_args(argv)
 
     root = os.path.abspath(args.path)
     if not os.path.isdir(root):
-        print("xato: papka emas: %s" % args.path, file=sys.stderr)
+        print("error: not a folder: %s" % args.path, file=sys.stderr)
         return EXIT_USAGE
 
     try:
         findings, found = check(root)
     except OSError as e:
-        print("xato: %s" % e, file=sys.stderr)
+        print("error: %s" % e, file=sys.stderr)
         return EXIT_ERROR
 
     if args.json:

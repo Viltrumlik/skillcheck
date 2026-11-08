@@ -17,14 +17,14 @@ skillcheck
 ```
 
 ```
-XATO  skills/demo/SKILL.md: name 'Demo_Skill' qoidaga mos emas
-       faqat kichik harf, raqam va defis; defis bilan boshlanmaydi
-XATO  hooks/hooks.json SessionStart[0].hooks[0]: command 'scripts/gone.py' faylini
-       ko'rsatadi, u mavjud emas
-ogoh  .claude-plugin/plugin.json: keywords yo'q
-       qidiruvda topilmaydi
+ERROR skills/demo/SKILL.md: name 'Demo_Skill' breaks the pattern
+       lowercase letters, digits and hyphens; cannot start or end with a hyphen
+ERROR hooks/hooks.json SessionStart[0].hooks[0]: command points at
+       'scripts/gone.py', which does not exist
+warn  .claude-plugin/plugin.json: no keywords
+       it will not turn up in search
 
-2 xato, 1 ogohlantirish (4 fayl)
+2 errors, 1 warning (4 files)
 ```
 
 ## What it checks
