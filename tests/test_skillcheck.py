@@ -253,3 +253,28 @@ class UnitTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class CrossDriveTest(unittest.TestCase):
+    """Windows'da C: va D: aralashganda relpath ValueError tashlaydi.
+
+    CI shu holatni yaratadi: vaqtinchalik papka bir diskda, repo boshqasida.
+    macOS va Linux'da buni tabiiy yo'l bilan qayta tiklab bo'lmaydi,
+    shuning uchun relpath'ning o'zi xato tashlashga majburlanadi.
+    """
+
+    def test_a_cross_drive_path_is_shown_whole_instead_of_crashing(self):
+        import os.path as op
+        real = op.relpath
+
+        def explode(path, start=None):
+            raise ValueError("path is on mount 'C:', start on mount 'D:'")
+
+        op.relpath = explode
+        try:
+            self.assertEqual(sc.relative("C:\\tmp\\x\\SKILL.md"), "C:\\tmp\\x\\SKILL.md")
+        finally:
+            op.relpath = real
+
+    def test_normally_it_shortens(self):
+        self.assertEqual(sc.relative("/a/b/c.md", "/a"), os.path.join("b", "c.md"))

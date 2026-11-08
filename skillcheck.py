@@ -39,6 +39,19 @@ KNOWN_EVENTS = {
 }
 
 
+def relative(path, start=None):
+    """Ko'rsatish uchun qisqartirilgan yo'l.
+
+    Windows'da turli disklardagi yo'llar uchun os.path.relpath ValueError
+    tashlaydi (C: va D:). Bunda qisqartirishdan voz kechamiz -- to'liq yo'l
+    xunukroq, lekin yiqilishdan yaxshiroq.
+    """
+    try:
+        return os.path.relpath(path, start)
+    except ValueError:
+        return path
+
+
 class Finding:
     def __init__(self, level, where, message, hint=None):
         self.level, self.where, self.message, self.hint = level, where, message, hint
@@ -64,10 +77,10 @@ def read_json(path):
         with open(path, encoding="utf-8") as f:
             return json.load(f), None
     except ValueError as e:
-        return None, error(path, "JSON o'qilmadi: %s" % e,
+        return None, error(relative(path), "JSON o'qilmadi: %s" % e,
                            "vergul yoki qavs tushib qolgan bo'lishi mumkin")
     except OSError as e:
-        return None, error(path, "fayl ochilmadi: %s" % e)
+        return None, error(relative(path), "fayl ochilmadi: %s" % e)
 
 
 # ---------------------------------------------------------------- SKILL.md
@@ -92,8 +105,8 @@ def parse_frontmatter(text):
     return fields
 
 
-def check_skill(path, findings):
-    where = os.path.relpath(path)
+def check_skill(path, findings, root=None):
+    where = relative(path, root)
     try:
         text = open(path, encoding="utf-8").read()
     except OSError as e:
@@ -142,8 +155,8 @@ def check_skill(path, findings):
 # ---------------------------------------------------------------- manifests
 
 
-def check_plugin_json(path, findings):
-    where = os.path.relpath(path)
+def check_plugin_json(path, findings, root=None):
+    where = relative(path, root)
     data, bad = read_json(path)
     if bad:
         findings.append(bad)
@@ -173,8 +186,8 @@ def check_plugin_json(path, findings):
     return data
 
 
-def check_marketplace_json(path, plugin, findings):
-    where = os.path.relpath(path)
+def check_marketplace_json(path, plugin, findings, root=None):
+    where = relative(path, root)
     data, bad = read_json(path)
     if bad:
         findings.append(bad)
@@ -212,8 +225,8 @@ def check_marketplace_json(path, plugin, findings):
                 % (entry["version"], plugin["version"])))
 
 
-def check_hooks_json(path, findings):
-    where = os.path.relpath(path)
+def check_hooks_json(path, findings, root=None):
+    where = relative(path, root)
     data, bad = read_json(path)
     if bad:
         findings.append(bad)
@@ -298,19 +311,19 @@ def check(root):
     found = collect(root)
     if not any([found["skills"], found["plugin"], found["marketplace"], found["hooks"]]):
         findings.append(warn(
-            os.path.relpath(root), "tekshiradigan narsa topilmadi",
+            relative(root), "tekshiradigan narsa topilmadi",
             "skills/<nom>/SKILL.md, .claude-plugin/ yoki hooks/hooks.json kutilgan"))
         return findings, found
     for path in found["skills"]:
-        check_skill(path, findings)
-    plugin = check_plugin_json(found["plugin"], findings) if found["plugin"] else None
+        check_skill(path, findings, root)
+    plugin = check_plugin_json(found["plugin"], findings, root) if found["plugin"] else None
     if found["marketplace"]:
-        check_marketplace_json(found["marketplace"], plugin, findings)
+        check_marketplace_json(found["marketplace"], plugin, findings, root)
     if found["hooks"]:
-        check_hooks_json(found["hooks"], findings)
+        check_hooks_json(found["hooks"], findings, root)
     if found["hooks"] and not found["plugin"]:
         findings.append(warn(
-            os.path.relpath(found["hooks"]), ".claude-plugin/plugin.json yo'q",
+            relative(found["hooks"], root), ".claude-plugin/plugin.json yo'q",
             "hooks faqat plugin sifatida o'rnatilganda ro'yxatdan o'tadi"))
     return findings, found
 
